@@ -109,6 +109,7 @@ app.post('/mentorData', async (req, res) => {
       return res.status(422).json({ error: "Please fill the fields properly" });
   }
 
+  // console.log(req.body)
   const userExist = await Mentor.findOne({ name: req.body.name });
   if (userExist) {
       return res.status(422).json({ error: "Name already exists" });
@@ -128,7 +129,32 @@ app.post('/mentorData', async (req, res) => {
   const user = new Mentor(userData);
 
   try {
-      const savedUser = await user.save();
+       await user.save();
+       console.log("mentordata is saved...")
+      // 1. check if CredModel already exists
+      const e =  req.body.email;
+      const CredModel = await credModel.findOne({ e});
+      console.log(CredModel)
+  
+      // if CredModel exists already, return error
+      if (CredModel)
+        return res.status(500).json({
+          message: "CredModel already exists! Try logging in. 😄",
+          type: "warning",
+        });
+  
+      // 2. if CredModel doesn't exist, create a new CredModel
+      // hashing the password
+      console.log(req.body.password)
+      const passwordHash = await hash(req.body.password, 10);
+      const newCredModel = new credModel({
+        email:req.body.email,
+        password: passwordHash,
+        mentorname:req.body.name,
+      });
+  
+      // 3. save the CredModel to the database
+      await newCredModel.save();
       res.status(201).json({ message: "User data saved successfully" });
   } catch (error) {
       console.error('An error occurred:', error);
@@ -156,6 +182,8 @@ app.post('/api/update', async (req, res) => {
 
     // Save the updated mentor to the database
     await mentorToUpdate.save();
+
+
 
     // Respond with a success message
     res.json({ message: 'Mentor studentsHandled updated successfully' });
@@ -216,6 +244,7 @@ app.post('/login',async (req,res)=>{
         console.log(CredModel.mentorname)
       }
 
+
   
       // if CredModel doesn't exist, return error
       if (!CredModel && !OwnModel){
@@ -225,13 +254,18 @@ app.post('/login',async (req,res)=>{
       else if(!OwnModel){
 
       // 2. if CredModel exists, check if password is correct
+      console.log(CredModel)
+      // const hash = await hash(CredModel.password, 10);
+      console.log(hash)
       const isMatch = await compare(password, CredModel.password);
   
       // if password is incorrect, return error
       if (!isMatch){
           console.log('password is incorrect...')
+        // Incorrect password, return a 401 Unauthorized response
+        return res.status(401).json({ error: 'Incorrect password' });
       }
-      await CredModel.save();
+      // await CredModel.save();
     
       // res.cookie('username', CredModel.mentorname, { maxAge: 3600000,path:'/' }); // 'username' cookie with a 1-hour (3600000 ms) expiration
 
@@ -245,13 +279,18 @@ app.post('/login',async (req,res)=>{
       else{
 
       // 2. if CredModel exists, check if password is correct
-      const isMatch = await compare(password, OwnModel.password);
+      console.log(password)
+      console.log(OwnModel.password)
+      const isMatch = (password  === OwnModel.password);
+      console.log("answer->"+isMatch)
   
       // if password is incorrect, return error
       if (!isMatch){
           console.log('password is incorrect...')
+        // Incorrect password, return a 401 Unauthorized response
+        return res.status(401).json({ error: 'Incorrect password' });
       }
-      await OwnModel.save();
+      // await OwnModel.save();
     
       // res.cookie('username', CredModel.mentorname, { maxAge: 3600000,path:'/' }); // 'username' cookie with a 1-hour (3600000 ms) expiration
 
@@ -271,56 +310,6 @@ app.post('/login',async (req,res)=>{
       });
     }
   });
-
-  app.get('/set-cookies', (req, res) => {
-    res.cookie('username', 'john_doe', { maxAge: 3600000 }); // 'username' cookie with a 1-hour (3600000 ms) expiration
-    res.cookie('token', 'abcdef123456', { httpOnly: true }); // 'token' cookie with httpOnly flag (accessible only via HTTP)
-    res.send('Cookies set successfully');
-  });
-
-
-
-app.post("/signup", async (req, res) => {
-    try {
-      const { email, password ,name} = req.body;
-  
-      // 1. check if CredModel already exists
-      const CredModel = await credModel.findOne({ email });
-  
-      // if CredModel exists already, return error
-      if (CredModel)
-        return res.status(500).json({
-          message: "CredModel already exists! Try logging in. 😄",
-          type: "warning",
-        });
-  
-      // 2. if CredModel doesn't exist, create a new CredModel
-      // hashing the password
-      const passwordHash = await hash(password, 10);
-      const newCredModel = new credModel({
-        email,
-        password: passwordHash,
-        mentorname:name,
-      });
-  
-      // 3. save the CredModel to the database
-      await newCredModel.save();
-  
-      // 4. send the response
-      res.status(200).json({
-        message: "CredModel created successfully! 🥳",
-        type: "success",
-      });
-    } catch (error) {
-      console.log(error);
-      res.status(500).json({
-        type: "error",
-        message: "Error creating CredModel!",
-        error,
-      });
-    }
-  });
-  
 
 
 
@@ -442,6 +431,40 @@ app.post("/signup", async (req, res) => {
       res.status(500).send("Error sending email.");
     }
   });
+
+
+  app.post('/change-password', async (req, res) => {
+    const { email, oldPassword, newPassword } = req.body;
+  
+    try {
+      // Find the user by email
+      const user = await credModel.findOne({ email });
+  
+      // If the user does not exist, return an error
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+  
+      // Check if the old password matches the one in the database
+      const passwordMatch = await compare(oldPassword, user.password);
+  
+      if (!passwordMatch) {
+        return res.status(401).json({ error: 'Incorrect old password' });
+      }
+  
+      // Hash the new password and update it in the database
+      // const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+      const hashedNewPassword = await hash(newPassword, 10);
+      user.password = hashedNewPassword;
+      await user.save();
+  
+      res.status(200).json({ message: 'Password changed successfully' });
+    } catch (error) {
+      console.error('An error occurred:', error);
+      res.status(500).json({ error: 'Failed to change password' });
+    }
+  });
+  
 
 
 
