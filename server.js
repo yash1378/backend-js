@@ -162,6 +162,34 @@ app.post('/mentorData', async (req, res) => {
   }
 });
 
+app.post("/student/:phone", async(req, res) => {
+  const phone = req.params.phone;
+  const {studentName,studentEmail} = req.body;
+  console.log(req.body);
+  try {
+
+    const user = await User.findOne({phone:phone});
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    user.name = studentName;
+    user.email = studentEmail;
+    await user.save();
+
+
+    // Respond with a success message
+    res.json({ message: 'UserData updated successfully' });
+    
+  } catch (error) {
+    console.error('An error occurred while updating data:', error);
+    res.status(500).json({ error: 'Internal server error' }); 
+  }
+
+
+
+  // return res.status(200).json({name:studentName,email:studentEmail});
+});
+
 
 // const Mentor = require('./models/mentor'); // Import your Mentor model
 
