@@ -164,7 +164,7 @@ app.post('/mentorData', async (req, res) => {
 
 app.post("/student/:phone", async(req, res) => {
   const phone = req.params.phone;
-  const {studentName,studentEmail} = req.body;
+  const {studentName,studentEmail,phoneNumber,selectedClass,selectedDate} = req.body;
   console.log(req.body);
   try {
 
@@ -172,8 +172,22 @@ app.post("/student/:phone", async(req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    user.name = studentName;
-    user.email = studentEmail;
+    if(studentName !== ""){
+      user.name = studentName;
+    }
+    if(studentEmail !== ""){
+      user.email = studentEmail;
+    }
+    if(phoneNumber !== ""){
+      user.phone = phoneNumber; 
+    }
+    if(selectedClass !== ""){
+      user.class = selectedClass; 
+    }
+    if(selectedDate !== ""){
+      user.date = selectedDate;
+    }
+
     await user.save();
 
 
