@@ -506,7 +506,50 @@ app.post('/login',async (req,res)=>{
       res.status(500).json({ error: 'Failed to change password' });
     }
   });
+
+
+  // DELETE route to delete data by IDs
+app.delete("/api/delete", async (req, res) => {
+  const { ids,mentors } = req.body;
+  console.log(req.body);
+
+  try {
+    // Use the Mongoose model to delete documents by IDs
+    await User.deleteMany({ _id: { $in: ids } });
+    console.log(mentors);
+    // Iterate through the mentors array and update the mentor's field value
+    for (const mentorName of mentors) {
+      await Mentor.updateOne({ name: mentorName }, { $inc: { on: -1 } });
+      await Mentor.updateOne({ name: mentorName }, { $inc: { total: -1 } });
+    }
+
+    res.status(200).json({message:"deleted successfully"}); // Respond with a 204 status (No Content) for success
+  } catch (error) {
+    console.error("Error deleting data:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
   
+
+app.post("/renroll", async (req, res) => {
+  const { studentName, mentorName, date } = req.body;
+
+
+  // Find the record in the database that matches both student and mentor names
+  const matchingRecord = await User.findOne({ name: studentName ,mentor:mentorName});
+  console.log(matchingRecord.date)
+
+  if (!matchingRecord) {
+    return res.status(404).json({ error: "Record not found" });
+  }
+
+  // Update the date for the matching record
+  matchingRecord.date = date;
+  await matchingRecord.save();
+
+  // Respond with a success message
+  res.json({ message: "Record updated successfully" });
+});
 
 
 
