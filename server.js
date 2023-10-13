@@ -7,12 +7,48 @@ require('dotenv').config()
 require('./db/conn');
 const User = require('./model/userSchema');
 const Own = require('./model/ownschema');
+const Reuser = require("./model/renroll")
 const Mentor = require('./model/mentorschema');
 const credModel = require('./model/mlogin')
 const cookieParser = require("cookie-parser");
 const { hash, compare } = require("bcryptjs");
 const nodemailer = require("nodemailer");
+const mongoose = require('mongoose');
+// Mongoose setup and connection
+const mongoURI = `mongodb+srv://${process.env.Database_Username}:${process.env.Database_Password}@nodeexpressproject.qp0arwg.mongodb.net/${process.env.Database_Name}?retryWrites=true&w=majority`;
+mongoose
+  .connect(mongoURI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    useCreateIndex: true,
+  })
+  .then(() => {
+    console.log("MongoDB connected...");
+  })
+  .catch((err) => {
+    console.error("Error connecting to MongoDB:", err);
+  });
 
+// The rest of your code remains the same
+
+app.use((req, res, next) => {
+  // Log the request method, URL, and timestamp to your MongoDB Atlas collection
+  const logEntry = {
+    method: req.method,
+    url: req.url,
+    timestamp: new Date(),
+  };
+
+  const logCollection = mongoose.connection.collection("logs"); // Access the logs collection
+
+  logCollection.insertOne(logEntry, (error, result) => {
+    if (error) {
+      console.error("Failed to log the request:", error);
+    }
+  });
+
+  next(); // Continue processing the request
+});
 
 // Use the cors middleware
 app.use(cors());
@@ -164,11 +200,16 @@ app.post('/mentorData', async (req, res) => {
 
 app.post("/student/:phone", async(req, res) => {
   const phone = req.params.phone;
-  const {studentName,studentEmail,phoneNumber,selectedClass,selectedDate} = req.body;
-  console.log(req.body);
+  const {studentName,studentEmail,phoneNumber,selectedClass,selectedDate,newmentor} = req.body;
+  // console.log(req.body);
   try {
 
     const user = await User.findOne({phone:phone});
+    const ment = await Mentor.findOne({name:user.mentor});
+    const newment = await Mentor.findOne({name:newmentor});
+    console.log(user)
+    console.log(ment)
+    console.log(newment)
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -187,8 +228,15 @@ app.post("/student/:phone", async(req, res) => {
     if(selectedDate !== ""){
       user.date = selectedDate;
     }
+    if(newmentor !== ""){
+      ment.on=ment.on-1;
+      newment.on=newment.on+1;
+      user.mentor = newmentor;
+    }
 
     await user.save();
+    await ment.save();
+    await newment.save();
 
 
     // Respond with a success message
@@ -204,6 +252,47 @@ app.post("/student/:phone", async(req, res) => {
   // return res.status(200).json({name:studentName,email:studentEmail});
 });
 
+app.post("/mentorupdate/:phone", async(req, res) => {
+  const phone = req.params.phone;
+  console.log(phone)
+  const {name,email,phoneno,} = req.body;
+  // console.log(req.body);
+  try {
+
+    const user = await Mentor.findOne({number:phone});
+    const cred = await credModel.findOne({mentorname:user.name});
+    console.log(user)
+    console.log(cred)
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if(name !== ""){
+      user.name = name;
+      cred.mentorname = name;
+    }
+    if(email !== ""){
+      cred.email = email;
+    }
+    if(phoneno !== ""){
+      user.number = phoneno; 
+    }
+
+    await user.save();
+    await cred.save();
+
+
+    // Respond with a success message
+    res.json({ message: 'UserData updated successfully' });
+    
+  } catch (error) {
+    console.error('An error occurred while updating data:', error);
+    res.status(500).json({ error: 'Internal server error' }); 
+  }
+
+
+
+  // return res.status(200).json({name:studentName,email:studentEmail});
+});
 
 // const Mentor = require('./models/mentor'); // Import your Mentor model
 
@@ -530,26 +619,59 @@ app.delete("/api/delete", async (req, res) => {
   }
 });
   
+app.post("/renrollment", async (req, res) => {
+  const { studentName, mentorName, date, phone, email, classs, sub } = req.body;
+  console.log(req.body);
 
-app.post("/renroll", async (req, res) => {
-  const { studentName, mentorName, date } = req.body;
-
-
-  // Find the record in the database that matches both student and mentor names
-  const matchingRecord = await User.findOne({ name: studentName ,mentor:mentorName});
-  console.log(matchingRecord.date)
-
-  if (!matchingRecord) {
-    return res.status(404).json({ error: "Record not found" });
+  if (!studentName || !phone || !mentorName || !date || !classs || !sub || !email) {
+    return res.status(422).json({ error: "Please fill the fields properly" });
   }
 
-  // Update the date for the matching record
-  matchingRecord.date = date;
-  await matchingRecord.save();
+  // Check if a user with the same name already exists
+  const existingUser = await Reuser.findOne({ name: studentName });
 
-  // Respond with a success message
-  res.json({ message: "Record updated successfully" });
+  if (existingUser) {
+    // User already exists, update their data
+    existingUser.phone = phone;
+    existingUser.email = email;
+    existingUser.date = date;
+    existingUser.class = classs;
+    existingUser.sub = sub;
+    existingUser.mentor = mentorName;
+
+    // Increment the 'renrollment' field
+    existingUser.renrollment += 1;
+
+    try {
+      await existingUser.save();
+      res.status(200).json({ message: "User data updated successfully" });
+    } catch (error) {
+      console.error("An error occurred while updating user data:", error);
+      res.status(500).json({ error: "Failed to update user data" });
+    }
+  } else {
+    // User doesn't exist, create a new user
+    const newUser = new Reuser({
+      name: studentName,
+      phone: phone,
+      email: email,
+      date: date,
+      class: classs,
+      sub: sub,
+      mentor: mentorName,
+      renrollment: 1,
+    });
+
+    try {
+      await newUser.save();
+      res.status(201).json({ message: "User data saved successfully" });
+    } catch (error) {
+      console.error("An error occurred while saving user data:", error);
+      res.status(500).json({ error: "Failed to save user data" });
+    }
+  }
 });
+
 
 
 
