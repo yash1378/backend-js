@@ -629,6 +629,23 @@ app.post("/renrollment", async (req, res) => {
 
   // Check if a user with the same name already exists
   const existingUser = await Reuser.findOne({ name: studentName });
+  const newUsers = new User({
+    name: studentName,
+    phone: phone,
+    email: email,
+    date: date,
+    class: classs,
+    sub: sub,
+    mentor: mentorName,
+  });
+
+  try {
+    await newUsers.save();
+    // res.status(200).json({ message: "User data updated successfully" });
+  } catch (error) {
+    console.error("An error occurred while updating user data:", error);
+    // res.status(500).json({ error: "Failed to update user data" });
+  }
 
   if (existingUser) {
     // User already exists, update their data
@@ -664,6 +681,7 @@ app.post("/renrollment", async (req, res) => {
 
     try {
       await newUser.save();
+
       res.status(201).json({ message: "User data saved successfully" });
     } catch (error) {
       console.error("An error occurred while saving user data:", error);
