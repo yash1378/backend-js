@@ -16,6 +16,8 @@ const nodemailer = require("nodemailer");
 const mongoose = require('mongoose');
 // Mongoose setup and connection
 const mongoURI = `mongodb+srv://${process.env.Database_Username}:${process.env.Database_Password}@nodeexpressproject.qp0arwg.mongodb.net/${process.env.Database_Name}?retryWrites=true&w=majority`;
+// ... (your existing code)
+// Mongoose setup and connection
 mongoose
   .connect(mongoURI, {
     useNewUrlParser: true,
@@ -23,23 +25,38 @@ mongoose
     useCreateIndex: true,
   })
   .then(() => {
-    console.log("MongoDB connected...");
+    console.log("connected MongoDB...");
   })
   .catch((err) => {
     console.error("Error connecting to MongoDB:", err);
   });
 
-// The rest of your code remains the same
+// Access the logs collection
+const logCollection = mongoose.connection.collection("logs");
+// Use the cors middleware
+app.use(cors());
+// app.use(express.urlencoded(extended:true))
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json()); 
+app.use(cookieParser());
 
+// Middleware to log API calls with details about which API was hit and what was updated
 app.use((req, res, next) => {
-  // Log the request method, URL, and timestamp to your MongoDB Atlas collection
+  if(req.method==="POST"){
+    console.log(req.body);
+  }
+
   const logEntry = {
     method: req.method,
     url: req.url,
     timestamp: new Date(),
+    // requestBody: req.body,
   };
 
-  const logCollection = mongoose.connection.collection("logs"); // Access the logs collection
+  if ( req.method === "POST" || req.method === "PUT" || req.method === "DELETE") {
+    // For POST, PUT, and DELETE requests, include information about the request body
+    logEntry.requestData = req.body;
+  }
 
   logCollection.insertOne(logEntry, (error, result) => {
     if (error) {
@@ -50,12 +67,11 @@ app.use((req, res, next) => {
   next(); // Continue processing the request
 });
 
-// Use the cors middleware
-app.use(cors());
-// app.use(express.urlencoded(extended:true))
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json()); 
-app.use(cookieParser());
+
+
+// ... (the rest of your code)
+
+
 
 
 // Define a route for the root URL
