@@ -81,7 +81,7 @@ app.get("/api/data", async (req, res) => {
 
     // Find data in the User model based on query parameters
     const data = await User.find(conditions);
-    console.log("hello world")
+    console.log("hello world");
 
     res.json(data);
   } catch (error) {
@@ -129,7 +129,7 @@ app.post("/", async (req, res) => {
 
     try {
       await newUser.save();
-      
+
       res.status(201).json({ message: "User data saved successfully" });
     } catch (error) {
       console.error("An error occurred while saving user data:", error);
@@ -172,6 +172,7 @@ app.get("/api/ownerData", async (req, res) => {
   }
 });
 
+// -->Done
 app.post("/mentorData", async (req, res) => {
   // console.log(req.body);
   if (!req.body.name || !req.body.phone) {
@@ -231,6 +232,7 @@ app.post("/mentorData", async (req, res) => {
   }
 });
 
+// --> Done
 app.post("/student/:phone", async (req, res) => {
   const phone = req.params.phone;
   const {
@@ -287,6 +289,7 @@ app.post("/student/:phone", async (req, res) => {
   // return res.status(200).json({name:studentName,email:studentEmail});
 });
 
+//to update the mentordata --> it is left
 app.post("/mentorupdate/:phone", async (req, res) => {
   const phone = req.params.phone;
   console.log(phone);
@@ -325,10 +328,10 @@ app.post("/mentorupdate/:phone", async (req, res) => {
 });
 
 // const Mentor = require('./models/mentor'); // Import your Mentor model
-
+// -->Left
 app.post("/api/update", async (req, res) => {
   const { mentorName, studentCount } = req.body;
-  // console.log(req.body);
+  console.log(typeof studentCount);
 
   try {
     // Find the mentor by name in your data (replace this with your database query)
@@ -337,9 +340,10 @@ app.post("/api/update", async (req, res) => {
     if (!mentorToUpdate) {
       return res.status(404).json({ error: "Mentor not found" });
     }
-
     // Update the studentsHandled field for the mentor
-    mentorToUpdate.handle = studentCount; // Corrected from "mentorToUpdate.handle"
+    const parsedStudentCount = parseInt(studentCount, 10);
+    const w = mentorToUpdate.handle;
+    mentorToUpdate.handle = w + parsedStudentCount;
 
     // Save the updated mentor to the database
     await mentorToUpdate.save();
@@ -352,6 +356,7 @@ app.post("/api/update", async (req, res) => {
   }
 });
 
+// --Done
 app.post("/api/finalMentor", async (req, res) => {
   try {
     const { mentorName, studentIds } = req.body;
@@ -359,10 +364,10 @@ app.post("/api/finalMentor", async (req, res) => {
     console.log(mentorName);
     console.log(studentIds);
 
-    const students = await User.find({ _id: { $in: studentIds }});
+    const students = await User.find({ _id: { $in: studentIds } });
 
     // Extract an array of phone numbers from the 'students' array
-    const phoneNumbers = students.map(student => student.phone);
+    const phoneNumbers = students.map((student) => student.phone);
     console.log(phoneNumbers);
 
     // Update students in the user table
@@ -395,6 +400,7 @@ app.post("/api/finalMentor", async (req, res) => {
   }
 });
 
+// -->Done
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -466,6 +472,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
+// -->Left
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,
@@ -567,11 +574,9 @@ app.post("/send-password-reset-email", async (req, res) => {
       CredModel.password = passwordHash;
       await CredModel.save();
 
-      res
-        .status(200)
-        .json({
-          message: "Email Sent Successfully and Password updated successfully",
-        });
+      res.status(200).json({
+        message: "Email Sent Successfully and Password updated successfully",
+      });
     } catch (error) {
       res
         .status(500)
@@ -588,6 +593,7 @@ app.post("/send-password-reset-email", async (req, res) => {
   }
 });
 
+// -->Done
 app.post("/change-password", async (req, res) => {
   const { email, oldPassword, newPassword } = req.body;
 
@@ -620,6 +626,7 @@ app.post("/change-password", async (req, res) => {
   }
 });
 
+// -->Done
 // DELETE route to delete data by IDs
 app.delete("/api/delete", async (req, res) => {
   const { ids, mentors } = req.body;
@@ -651,6 +658,8 @@ app.delete("/api/delete", async (req, res) => {
   }
 });
 
+// -->Done
+
 app.get("/api/renrollData", async (req, res) => {
   try {
     const conditions = req.query; // Query parameters for conditions
@@ -666,29 +675,40 @@ app.get("/api/renrollData", async (req, res) => {
   }
 });
 
+// -->Done
 app.post("/renrollment", async (req, res) => {
   const { studentName, mentorName, date, phone, email, classs, sub } = req.body;
   console.log(req.body);
 
-  if (!studentName || !phone || !mentorName || !date || !classs || !sub || !email) {
+  if (
+    !studentName ||
+    !phone ||
+    !mentorName ||
+    !date ||
+    !classs ||
+    !sub ||
+    !email
+  ) {
     return res.status(500).json({ error: "Please fill the fields properly" });
   }
-    // Calculate today's date and thirty days ago date in "YYYY-MM-DD" format
-    const today = new Date().toISOString().split("T")[0];
-    const dte = await Reuser.findOne({ phone: phone });
-    console.log(dte.date)
+  // Calculate today's date and thirty days ago date in "YYYY-MM-DD" format
+  const today = new Date().toISOString().split("T")[0];
+  const dte = await Reuser.findOne({ phone: phone });
+  console.log(dte.date);
 
-
-  console.log("ram ram bhai ")
+  console.log("ram ram bhai ");
   // console.log(thirtyDaysAgo)
-  console.log(date)
+  console.log(date);
   // console.log(existingRenrollment)
   if (dte) {
-    const diffInDays = Math.floor((new Date(date) - new Date(dte.date)) / (1000 * 60 * 60 * 24));
+    const diffInDays = Math.floor(
+      (new Date(date) - new Date(dte.date)) / (1000 * 60 * 60 * 24)
+    );
 
     if (diffInDays < 30) {
       return res.status(500).json({
-        error: "A re-enrollment for this phone number has already been done within the last 30 days.",
+        error:
+          "A re-enrollment for this phone number has already been done within the last 30 days.",
       });
     }
   }
@@ -753,8 +773,6 @@ app.post("/renrollment", async (req, res) => {
     }
   }
 });
-
-
 
 // Start the server
 app.listen(port, () => {
