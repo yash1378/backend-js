@@ -342,7 +342,7 @@ app.post("/api/update", async (req, res) => {
     }
     // Update the studentsHandled field for the mentor
     const parsedStudentCount = parseInt(studentCount, 10);
-    const w = mentorToUpdate.handle;
+    const w = mentorToUpdate.on;
     mentorToUpdate.handle = w + parsedStudentCount;
 
     // Save the updated mentor to the database
