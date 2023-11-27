@@ -172,6 +172,25 @@ app.get("/api/ownerData", async (req, res) => {
   }
 });
 
+app.get("/ownerData", async (req, res) => {
+  try {
+    const conditions = req.query; // Query parameters for conditions
+    // console.log(req.query);
+
+    // Specify the fields you want to retrieve (name and id)
+    const fieldsToRetrieve = "ownername _id";
+
+    // Find data in the User model based on query parameters
+    const data = await Own.find(conditions).select(fieldsToRetrieve);
+
+    res.json(data);
+  } catch (error) {
+    console.error("An error occurred:", error);
+    res.status(500).json({ error: "An error occurred while fetching data." });
+  }
+});
+
+
 // -->Done
 app.post("/mentorData", async (req, res) => {
   // console.log(req.body);
@@ -406,40 +425,41 @@ app.post("/login", async (req, res) => {
     const { email, password } = req.body;
 
     // 1. check if CredModel exists
-    const CredModel = await credModel.findOne({ email });
+    // const CredModel = await credModel.findOne({ email });
     const OwnModel = await Own.findOne({ email });
-    if (CredModel) {
-      console.log(CredModel);
-      console.log(CredModel.mentorname);
-    }
+    // if (CredModel) {
+    //   console.log(CredModel);
+    //   console.log(CredModel.mentorname);
+    // }
 
     // if CredModel doesn't exist, return error
-    if (!CredModel && !OwnModel) {
-      console.log("CredModel does not exist");
-      return;
-    } else if (!OwnModel) {
-      // 2. if CredModel exists, check if password is correct
-      console.log(CredModel);
-      // const hash = await hash(CredModel.password, 10);
-      console.log(hash);
-      const isMatch = await compare(password, CredModel.password);
+    // if (!CredModel && !OwnModel) {
+    //   console.log("CredModel does not exist");
+    //   return;
+    // } 
+    // if (!OwnModel) {
+    //   // 2. if CredModel exists, check if password is correct
+    //   console.log(CredModel);
+    //   // const hash = await hash(CredModel.password, 10);
+    //   console.log(hash);
+    //   const isMatch = await compare(password, CredModel.password);
 
-      // if password is incorrect, return error
-      if (!isMatch) {
-        console.log("password is incorrect...");
-        // Incorrect password, return a 401 Unauthorized response
-        return res.status(401).json({ error: "Incorrect password" });
-      }
-      // await CredModel.save();
+    //   // if password is incorrect, return error
+    //   if (!isMatch) {
+    //     console.log("password is incorrect...");
+    //     // Incorrect password, return a 401 Unauthorized response
+    //     return res.status(401).json({ error: "Incorrect password" });
+    //   }
+    //   // await CredModel.save();
 
-      // res.cookie('username', CredModel.mentorname, { maxAge: 3600000,path:'/' }); // 'username' cookie with a 1-hour (3600000 ms) expiration
+    //   // res.cookie('username', CredModel.mentorname, { maxAge: 3600000,path:'/' }); // 'username' cookie with a 1-hour (3600000 ms) expiration
 
-      res.status(200).json({
-        message: "Logged in successfully! 🥳",
-        name: CredModel.mentorname,
-        type: "mentor",
-      });
-    } else {
+    //   res.status(200).json({
+    //     message: "Logged in successfully! 🥳",
+    //     name: CredModel.mentorname,
+    //     type: "mentor",
+    //   });
+    // } else {
       // 2. if CredModel exists, check if password is correct
       console.log(password);
       console.log(OwnModel.password);
@@ -461,7 +481,7 @@ app.post("/login", async (req, res) => {
         name: OwnModel.ownername,
         type: "owner",
       });
-    }
+    // }
   } catch (error) {
     console.log(error);
     res.status(500).json({
