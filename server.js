@@ -794,6 +794,17 @@ app.post("/renrollment", async (req, res) => {
   }
 });
 
+app.post('/razorpay/callback/', (req, res) => {
+  const body = req.body;
+
+  // Log the request body
+  console.log('Razorpay Callback:', body);
+
+  // Process the payment confirmation as needed
+
+  res.json({ status: 'success' }); // Respond to Razorpay to acknowledge receipt
+});
+
 // Start the server
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
