@@ -14,6 +14,7 @@ const cookieParser = require("cookie-parser");
 const { hash, compare } = require("bcryptjs");
 const nodemailer = require("nodemailer");
 const mongoose = require("mongoose");
+const compression = require("compression");
 // Mongoose setup and connection
 const mongoURI = `mongodb+srv://${process.env.Database_Username}:${process.env.Database_Password}@nodeexpressproject.qp0arwg.mongodb.net/${process.env.Database_Name}?retryWrites=true&w=majority`;
 // ... (your existing code)
@@ -34,11 +35,12 @@ mongoose
 // Access the logs collection
 const logCollection = mongoose.connection.collection("logs");
 // Use the cors middleware
-app.use(cors());
+app.use(cors('*'));
 // app.use(express.urlencoded(extended:true))
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
+app.use(compression());
 
 // Middleware to log API calls with details about which API was hit and what was updated
 app.use((req, res, next) => {
@@ -175,6 +177,7 @@ app.get("/api/ownerData", async (req, res) => {
 app.get("/ownerData", async (req, res) => {
   try {
     const conditions = req.query; // Query parameters for conditions
+    console.log(req.query);
     // console.log(req.query);
 
     // Specify the fields you want to retrieve (name and id)
@@ -188,6 +191,26 @@ app.get("/ownerData", async (req, res) => {
     console.error("An error occurred:", error);
     res.status(500).json({ error: "An error occurred while fetching data." });
   }
+});
+
+// Express.js example
+app.post("/ownerData/checkAuthorization", async (req, res) => {
+  try{
+    const conditions = req.query; // Query parameters for conditions
+
+    // Your logic to check if userId corresponds to an owner
+    // const ownerData = yourAuthorizationCheckFunction(userId);
+    const toret = "_id";
+    const data = await Own.find(conditions).select(toret);
+  
+  
+    res.status(200).json({ success: "owner exists" });
+  }
+  catch(error){
+    console.error("An error occurred:", error);
+    res.status(500).json({ error: "An error occurred while fetching data." });   
+  }
+
 });
 
 
@@ -478,7 +501,7 @@ app.post("/login", async (req, res) => {
 
       res.status(200).json({
         message: "Logged in successfully! 🥳",
-        name: OwnModel.ownername,
+        id: OwnModel._id,
         type: "owner",
       });
     // }
