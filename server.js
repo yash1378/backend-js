@@ -35,7 +35,7 @@ mongoose
 // Access the logs collection
 const logCollection = mongoose.connection.collection("logs");
 // Use the cors middleware
-app.use(cors('*'));
+app.use(cors());
 // app.use(express.urlencoded(extended:true))
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
