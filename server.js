@@ -34,7 +34,8 @@ const logCollection = mongoose.connection.collection("logs");
 app.use(cors());
 
 // RabbitMQ connection
-const RABBITMQ_URL = 'amqp://guest:guest@localhost:5672/';
+// const RABBITMQ_URL = 'amqp://guest:guest@localhost:5672/';
+const RABBITMQ_URL = "amqps://afikymcl:BiY52J206mURPm19CXa_ZMDbbJCSXKav@beaver.rmq.cloudamqp.com/afikymcl"
 let channel;
 
 const connectToRabbitMQ = async () => {
