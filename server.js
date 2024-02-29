@@ -3,10 +3,12 @@ const app = express();
 const port = 4000;
 const cors = require("cors");
 require("dotenv").config();
-
+const multer = require('multer');
 require("./db/conn");
 const User = require("./model/userSchema");
+const Feed = require("./model/feedback");
 const Own = require("./model/ownschema");
+const amqp = require('amqplib');
 const Reuser = require("./model/renroll");
 const Mentor = require("./model/mentorschema");
 const credModel = require("./model/mlogin");
@@ -15,27 +17,64 @@ const { hash, compare } = require("bcryptjs");
 const nodemailer = require("nodemailer");
 const mongoose = require("mongoose");
 const compression = require("compression");
-// Mongoose setup and connection
-const mongoURI = `mongodb+srv://${process.env.Database_Username}:${process.env.Database_Password}@nodeexpressproject.qp0arwg.mongodb.net/${process.env.Database_Name}?retryWrites=true&w=majority`;
-// ... (your existing code)
-// Mongoose setup and connection
-mongoose
-  .connect(mongoURI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    useCreateIndex: true,
-  })
-  .then(() => {
-    console.log("connected MongoDB...");
-  })
-  .catch((err) => {
-    console.error("Error connecting to MongoDB:", err);
-  });
+// Configure multer for handling file uploads
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+const ObjectId = require('mongoose').Types.ObjectId;
+
+// Define a Set to track sent IDs
+let sentIdsSet = new Set();
+// Use a promise to ensure sequential execution
+let fetchingDataPromise = Promise.resolve();
 
 // Access the logs collection
 const logCollection = mongoose.connection.collection("logs");
 // Use the cors middleware
 app.use(cors());
+
+// RabbitMQ connection
+const RABBITMQ_URL = 'amqp://guest:guest@localhost:5672/';
+let channel;
+
+const connectToRabbitMQ = async () => {
+  try {
+    const connection = await amqp.connect(RABBITMQ_URL);
+    channel = await connection.createChannel();
+    const queue = 'mentor_queue';
+    channel.assertQueue(queue, { durable: false });
+    console.log('Connected to RabbitMQ');
+
+    // Call consumeMessages once the RabbitMQ connection is established
+    consumeMessages();
+  } catch (error) {
+    console.error('Error connecting to RabbitMQ:', error);
+  }
+};
+
+// Function to save mentor data to MongoDB
+const saveMentorData = async (mentorData) => {
+  try {
+    const mentor = new Feed(mentorData);
+    await mentor.save();
+    console.log('Mentor data saved to MongoDB:');
+  } catch (error) {
+    console.error('Error saving mentor data to MongoDB:', error);
+  }
+};
+
+
+// When a message is received on the queue, the consumeMessages function parses the message 
+// (assuming it's in JSON format) and calls saveMentorData to save the mentor data to MongoDB.
+// Consume messages from RabbitMQ and save mentor data to MongoDB
+const consumeMessages = () => {
+  channel.consume('mentor_queue', (msg) => {
+    const mentorData = JSON.parse(msg.content.toString());
+    saveMentorData(mentorData);
+  }, { noAck: true });
+//   noAck: true means that RabbitMQ will remove the message from the queue once it has been successfully received, ensuring that the message is processed only once.
+};
+
 // app.use(express.urlencoded(extended:true))
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -827,6 +866,136 @@ app.post('/razorpay/callback/', (req, res) => {
 
   res.json({ status: 'success' }); // Respond to Razorpay to acknowledge receipt
 });
+
+
+// Define a route to get feedbacks with pagination
+app.get('/api/feedbacks', async (req, res) => {
+  try {
+    console.log(req.query)
+    const page = parseInt(req.query.page); // default to page 1 if not provided
+    const limit = parseInt(req.query.limit) || 3; // default to limit 3 if not provided
+    console.log(page)
+    // Use a promise to ensure sequential execution
+    fetchingDataPromise = fetchingDataPromise.then(async () => {
+      if (page === 1) {
+        // Clear the Set when page is 1
+        sentIdsSet.clear();
+      }
+
+      // Retrieve feedbacks with pagination and filtering from the collection
+      const feedbacks = await Feed.find({
+        _id: { $nin: Array.from(sentIdsSet) } // Exclude IDs that have already been sent
+      })
+        .sort({ rating: -1, averageTime: -1, enrollments: -1 }) // Sort by your criteria
+        .limit(limit);
+
+      if (feedbacks.length > 0) {
+        // Update the Set with the new IDs
+        feedbacks.forEach((feedback) => {
+          sentIdsSet.add(feedback._id.toString());
+        });
+        res.json(feedbacks);
+      }
+      else{
+        res.json({ message: 'No more feedbacks to send' });
+      }
+
+      // Print the Set contents to the console
+      // console.log('sentIdsSet:', Array.from(sentIdsSet));
+
+      // Send the feedbacks as JSON response
+
+    });
+  } catch (error) {
+    console.error('Error fetching feedbacks:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// API endpoint to send mentor data to RabbitMQ
+app.post('/api/save-mentor',upload.single('image'), (req, res) => {
+  try {
+    const { name, college, enrollments, rating, averageTime,experience } = req.body;
+    const imageData = req.file;
+
+    // Log or debug the imageData to check if it's correctly received
+    // console.log('ImageData:', imageData.mimetype);
+
+    // Send mentor data to RabbitMQ for asynchronous processing
+    const mentorData = {
+      name,
+      college,
+      enrollments,
+      rating,
+      averageTime,
+      experience,
+      image: imageData ? `data:${imageData.mimetype};base64,${imageData.buffer.toString('base64')}` : null,
+    };
+
+    channel.sendToQueue('mentor_queue', Buffer.from(JSON.stringify(mentorData)));
+
+    res.status(201).json({ message: 'Mentor data sent to RabbitMQ for processing.' });
+  } catch (error) {
+    console.error('Error sending mentor data to RabbitMQ:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+connectToRabbitMQ();
+
+
+app.post('/api/increase/:mentorId', async (req, res) => {
+  try {
+    const mentorId = req.params.mentorId;
+
+    // Check if mentorId is a valid ObjectId
+    if (!ObjectId.isValid(mentorId)) {
+      return res.status(400).json({ error: 'Invalid mentor ID' });
+    }
+
+    // Fetch current mentor data from the database
+    const currentMentor = await Feed.findById(mentorId);
+
+    if (!currentMentor) {
+      return res.status(404).json({ error: 'Mentor not found' });
+    }
+    console.log(req.body)
+
+    const newRating = parseFloat(req.body.rating); // Parse string to float
+    const newAverageTime = parseFloat(req.body.averageTime); // Parse string to float
+    console.log(newRating);
+    console.log(newAverageTime);
+    console.log(currentMentor)
+
+    // Calculate updated values
+    const updatedRating = (parseFloat(currentMentor.rating) * currentMentor.no_of_reviews + newRating) / (currentMentor.no_of_reviews + 1);
+    const updatedAverageTime = (parseFloat(currentMentor.averageTime) * currentMentor.no_of_reviews + newAverageTime) / (currentMentor.no_of_reviews + 1);
+
+    // Find mentor by ID and update the values
+    const updatedMentor = await Feed.findByIdAndUpdate(
+      mentorId,
+      {
+        $set: {
+          rating: updatedRating, // Convert back to string for MongoDB if necessary
+          averageTime: updatedAverageTime.toString(), // Convert back to string for MongoDB if necessary
+          no_of_reviews: currentMentor.no_of_reviews + 1,
+        },
+      },
+      { new: true } // Returns the updated document
+    );
+
+    if (!updatedMentor) {
+      return res.status(404).json({ error: 'Mentor not found' });
+    }
+
+    res.status(200).json({ message: 'Mentor data updated successfully', mentor: updatedMentor });
+  } catch (error) {
+    console.error('Error processing mentor review:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
 
 // Start the server
 app.listen(port, () => {
